@@ -8,10 +8,26 @@ import org.jsoup.nodes.Document
 import java.math.BigDecimal
 import java.net.URL
 
+/**
+ * Реализация парсера для получения информации о товарах с сайта Yandex Market.
+ *
+ * @property forceUpdate Если `true`, при каждом вызове [getArticleInfo] будет производиться повторное обновление данных о товаре.
+ */
 class YandexMarketParserImpl(override val forceUpdate: Boolean = true) : Parser {
 
+    /**
+     * Объект [Article], содержащий информацию о товаре, загружаемый при первом вызове
+     * или при установленном флаге [forceUpdate].
+     */
     private lateinit var article: Article
 
+    /**
+     * Возвращает актуальную информацию о товаре по заданному URL.
+     * Если информация еще не была загружена или [forceUpdate] включен, вызывает метод для парсинга страницы.
+     *
+     * @param articleUrl URL страницы товара на Yandex Market.
+     * @return Объект [Article], содержащий актуальную информацию о товаре.
+     */
     override fun getArticleInfo(articleUrl: URL): Article {
         if (!::article.isInitialized || forceUpdate) {
             parseArticle(articleUrl)
@@ -19,6 +35,12 @@ class YandexMarketParserImpl(override val forceUpdate: Boolean = true) : Parser 
         return article
     }
 
+    /**
+     * Выполняет парсинг страницы Yandex Market для извлечения информации о названии и цене товара.
+     *
+     * @param articleUrl URL страницы товара на Yandex Market.
+     * @throws Exception если возникла ошибка при попытке извлечь данные.
+     */
     private fun parseArticle(articleUrl: URL) {
         try {
             println("Parsing page...")

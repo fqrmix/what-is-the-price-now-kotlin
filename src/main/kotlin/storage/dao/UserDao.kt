@@ -5,9 +5,12 @@ import org.example.storage.tables.Users
 import org.jetbrains.exposed.dao.LongEntity
 import org.jetbrains.exposed.dao.LongEntityClass
 import org.jetbrains.exposed.dao.id.EntityID
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 
+/**
+ * Data Access Object (DAO) для работы с сущностью пользователя.
+ *
+ * @property id Идентификатор пользователя.
+ */
 class UserDao(id: EntityID<Long>) : LongEntity(id) {
     companion object : LongEntityClass<UserDao>(Users)
 
@@ -15,6 +18,11 @@ class UserDao(id: EntityID<Long>) : LongEntity(id) {
     var tariff by Users.tariff
     var timeToNotify by Users.timeToNotify
 
+    /**
+     * Преобразует текущий объект DAO в объект пользователя.
+     *
+     * @return Экземпляр пользователя с данными из DAO.
+     */
     fun toUser() = User(id.value, name, tariff, timeToNotify)
 }
 
