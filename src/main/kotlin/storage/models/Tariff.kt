@@ -1,6 +1,7 @@
 package org.example.storage.models
 
 enum class Tariff {
+
     STANDART {
         override fun getTimeOfUpdate(): Long {
             return 6
@@ -16,8 +17,4 @@ enum class Tariff {
     };
 
     abstract fun getTimeOfUpdate(): Long
-
-    companion object {
-
-    }
 }

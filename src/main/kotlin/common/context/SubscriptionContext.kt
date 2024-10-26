@@ -1,11 +1,12 @@
-package org.example.common
+package org.example.common.context
 
+import org.example.common.context.Context
 import org.example.storage.models.Article
 import org.example.storage.models.Subscription
 import org.example.storage.models.User
-import java.time.LocalDateTime
 
 data class SubscriptionContext(
-    val user: User,
-    val subscription: Subscription
+    val user: User?,
+    val subscription: Subscription?,
+    var article: Article?
 ) : Context
