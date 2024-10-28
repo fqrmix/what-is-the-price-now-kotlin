@@ -10,6 +10,9 @@ import com.github.kotlintelegrambot.entities.keyboard.KeyboardButton
 import com.github.kotlintelegrambot.logging.LogLevel
 import com.github.kotlintelegrambot.types.TelegramBotResult
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import org.example.common.MessageTexts
 import org.example.service.ArticleService
 import org.example.service.SubscriptionService
@@ -24,6 +27,7 @@ import java.net.URL
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeParseException
+import kotlin.concurrent.thread
 
 /**
  * Класс, представляющий чат-бота.
@@ -208,6 +212,7 @@ class ChatBot {
     /**
      * Обрабатывает команду "Добавить товар" и добавляет новый товар в подписки пользователя.
      */
+    @OptIn(DelicateCoroutinesApi::class)
     private fun Dispatcher.handleAddSubscription() {
         message {
             val chatId = update.message?.chat?.id ?: return@message
@@ -271,68 +276,74 @@ class ChatBot {
                 }
 
                 UserState.ARTICLE_AWAITING_LINK -> {
-                    val url: URL?
-                    try {
-                        url = URL(text)
-                    } catch (e: MalformedURLException) {
-                        bot.sendMessage(ChatId.fromId(chatId), text = MessageTexts.Error.URL_IS_MALFORMED.text)
-                        return@message
-                    }
-
-                    var article: Article? = null
-
-                    try {
-                        bot.sendMessage(
-                            ChatId.fromId(chatId),
-                            text = "Пытаемся получить данные о товаре...",
-                        )
-                        article = articleService.parseArticle(url)
-                    } catch (e: Exception) {
-                        bot.sendMessage(
-                            ChatId.fromId(chatId),
-                            text = "При получении данных о товаре произошла ошибка. Попробуйте прислать ссылку еще раз.",
-                        )
-                    }
-
-                    val user = userService.getUserById(chatId)
-
-                    if (article != null) {
-                        var nextExecutionTime = user.timeToNotify?.let {
-                            LocalDateTime.now()
-                                .withHour(it.hour)
-                                .withMinute(it.minute)
-                                .withSecond(0)
+                    GlobalScope.launch {
+                        val url: URL?
+                        try {
+                            url = URL(text)
+                        } catch (e: MalformedURLException) {
+                            bot.sendMessage(ChatId.fromId(chatId), text = MessageTexts.Error.URL_IS_MALFORMED.text)
+                            return@launch
                         }
 
-                        if (nextExecutionTime != null) {
-                            if (nextExecutionTime < LocalDateTime.now()) {
-                                nextExecutionTime = nextExecutionTime.plusHours(24)
+                        val article: Article?
+
+                        try {
+                            bot.sendMessage(
+                                ChatId.fromId(chatId),
+                                text = "Пытаемся получить данные о товаре...",
+                            )
+
+                            article = articleService.parseArticle(url)
+
+
+                        } catch (e: Exception) {
+                            bot.sendMessage(
+                                ChatId.fromId(chatId),
+                                text = "При получении данных о товаре произошла ошибка. Попробуйте прислать ссылку еще раз.",
+                            )
+                            return@launch
+                        }
+
+                        val user = userService.getUserById(chatId)
+
+                        if (article != null) {
+                            var nextExecutionTime = user.timeToNotify?.let {
+                                LocalDateTime.now()
+                                    .withHour(it.hour)
+                                    .withMinute(it.minute)
+                                    .withSecond(0)
                             }
 
-                            val subscription = subscriptionService.addSubscription(
-                                Subscription(
-                                    id = 0,
-                                    userId = chatId,
-                                    article = article,
-                                    createdTime = LocalDateTime.now(),
-                                    nextExecutionTime = nextExecutionTime!!
-                                )
-                            )
-                            taskService.scheduleComparePriceTask(subscription, user, bot)
-                            logSuccessOrError({
-                                bot.sendMessage(
-                                    ChatId.fromId(chatId),
-                                    text = MessageTexts.SUBSCRIPTION_ADDED.text,
-                                    replyMarkup = createMainKeyboard()
-                                )
-                            })
+                            if (nextExecutionTime != null) {
+                                if (nextExecutionTime < LocalDateTime.now()) {
+                                    nextExecutionTime = nextExecutionTime.plusHours(24)
+                                }
 
-                            // Сбрасываем состояние
-                            userStates[chatId] = UserState.NONE
+                                val subscription = subscriptionService.addSubscription(
+                                    Subscription(
+                                        id = 0,
+                                        userId = chatId,
+                                        article = article,
+                                        createdTime = LocalDateTime.now(),
+                                        nextExecutionTime = nextExecutionTime!!
+                                    )
+                                )
+                                taskService.scheduleComparePriceTask(subscription, user, bot)
+                                logSuccessOrError({
+                                    bot.sendMessage(
+                                        ChatId.fromId(chatId),
+                                        text = MessageTexts.SUBSCRIPTION_ADDED.text,
+                                        replyMarkup = createMainKeyboard()
+                                    )
+                                })
+
+                                // Сбрасываем состояние
+                                userStates[chatId] = UserState.NONE
+                            }
+
+                        } else {
+                            bot.sendMessage(ChatId.fromId(chatId), text = MessageTexts.Error.SHOP_NOT_SUPPORTED.text)
                         }
-
-                    } else {
-                        bot.sendMessage(ChatId.fromId(chatId), text = MessageTexts.Error.SHOP_NOT_SUPPORTED.text)
                     }
                 }
 
@@ -346,41 +357,44 @@ class ChatBot {
     /**
      * Обрабатывает команду "Узнать цену сейчас" и проверяет изменение цен для подписок пользователя.
      */
+    @OptIn(DelicateCoroutinesApi::class)
     private fun Dispatcher.handleCheckPriceNow() {
         message {
             val chatId = update.message?.chat?.id ?: return@message
             val text = update.message?.text ?: return@message
 
             if (text == "Узнать цену сейчас") {
-                userStates[chatId] = UserState.NONE
-                val currentSubscriptions = subscriptionService.getUserSubscriptions(chatId)
-                if (currentSubscriptions.isEmpty()) {
-                    logSuccessOrError({
-                        bot.sendMessage(ChatId.fromId(chatId), text = MessageTexts.SUBSCRIPTION_NOT_FOUND.text)
-                    })
-                    return@message
-                }
-                var message = ""
-                currentSubscriptions.forEach {
-                    val (newPrice, isChanged) = articleService.checkPriceChange(it.article)
-                    if (isChanged) {
-                        subscriptionService.updateSubscriptionArticlePrice(it, newPrice!!)
-                        message += "Цена на ${it.article.name} изменилась! " +
-                                "Старая цена: ${it.article.price} " +
-                                "Новая цена: ${newPrice}\n"
-                    } else {
-                        message += "Цена на ${it.article.name} не изменилась!\n"
+                GlobalScope.launch {
+                    userStates[chatId] = UserState.NONE
+                    val currentSubscriptions = subscriptionService.getUserSubscriptions(chatId)
+                    if (currentSubscriptions.isEmpty()) {
+                        logSuccessOrError({
+                            bot.sendMessage(ChatId.fromId(chatId), text = MessageTexts.SUBSCRIPTION_NOT_FOUND.text)
+                        })
+                        return@launch
                     }
-                }
+                    var message = ""
+                    currentSubscriptions.forEach {
+                        val (newPrice, isChanged) = articleService.checkPriceChange(it.article)
+                        if (isChanged) {
+                            subscriptionService.updateSubscriptionArticlePrice(it, newPrice!!)
+                            message += "Цена на ${it.article.name} изменилась! " +
+                                    "Старая цена: ${it.article.price} " +
+                                    "Новая цена: ${newPrice}\n"
+                        } else {
+                            message += "Цена на ${it.article.name} не изменилась!\n"
+                        }
+                    }
 
-                logSuccessOrError({
-                    bot.sendMessage(
-                        ChatId.fromId(chatId),
-                        text = message,
-                        replyMarkup = createMainKeyboard()
-                    )
-                })
-                update.consume()
+                    logSuccessOrError({
+                        bot.sendMessage(
+                            ChatId.fromId(chatId),
+                            text = message,
+                            replyMarkup = createMainKeyboard()
+                        )
+                    })
+                    update.consume()
+                }
             }
         }
     }

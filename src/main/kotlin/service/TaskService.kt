@@ -2,6 +2,9 @@ package org.example.service
 
 import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.entities.ChatId
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import org.example.common.RunnableTask
 import org.example.common.Scheduler
 import org.example.storage.models.Subscription
@@ -29,7 +32,8 @@ object TaskService {
      * @param user Пользователь, который будет получать уведомления.
      * @param bot Объект бота, используемый для отправки сообщений.
      */
-    fun scheduleComparePriceTask(subscription: Subscription, user: User, bot: Bot) {
+    @OptIn(DelicateCoroutinesApi::class)
+    suspend fun scheduleComparePriceTask(subscription: Subscription, user: User, bot: Bot) {
         var nextExecutionTime = user.timeToNotify!!.let {
             LocalDateTime.now()
                 .withHour(it.hour)
@@ -45,28 +49,30 @@ object TaskService {
         scheduleInternalTask(
             subscription.id,
             RunnableTask {
-                try {
-                    val (newPrice, isChanged) = articleService.checkPriceChange(subscription.article)
-                    var message = ""
-                    if (isChanged) {
-                        subscriptionService.updateSubscriptionArticlePrice(subscription, newPrice!!)
-                        message += "Цена на ${subscription.article.name} изменилась! " +
-                                "Старая цена: ${subscription.article.price} " +
-                                "Новая цена: ${newPrice}\n"
-                    } else {
-                        message += "Цена на ${subscription.article.name} не изменилась!\n"
-                    }
+                GlobalScope.launch {
+                    try {
+                        val (newPrice, isChanged) = articleService.checkPriceChange(subscription.article)
+                        var message = ""
+                        if (isChanged) {
+                            subscriptionService.updateSubscriptionArticlePrice(subscription, newPrice!!)
+                            message += "Цена на ${subscription.article.name} изменилась! " +
+                                    "Старая цена: ${subscription.article.price} " +
+                                    "Новая цена: ${newPrice}\n"
+                        } else {
+                            message += "Цена на ${subscription.article.name} не изменилась!\n"
+                        }
 
-                    bot.sendMessage(
-                        ChatId.fromId(user.id),
-                        text = message
-                    )
-                } catch (e: Exception) {
-                    println(e.stackTrace)
+                        bot.sendMessage(
+                            ChatId.fromId(user.id),
+                            text = message
+                        )
+                    } catch (e: Exception) {
+                        println(e.stackTrace)
+                    }
+                    subscription.nextExecutionTime = nextExecutionTime
+                    subscriptionRepository.updateSubscription(subscription)
+                    scheduleComparePriceTask(subscription, user, bot)
                 }
-                subscription.nextExecutionTime = nextExecutionTime
-                subscriptionRepository.updateSubscription(subscription)
-                this.scheduleComparePriceTask(subscription, user, bot)
             },
             subscription.nextExecutionTime
         )

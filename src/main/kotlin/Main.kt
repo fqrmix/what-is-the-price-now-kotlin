@@ -4,7 +4,7 @@ import org.example.bot.ChatBot
 import org.example.service.TaskService
 
 
-fun main() {
+suspend fun main() {
     val chatBotEnvironment = ChatBot()
     with(chatBotEnvironment) {
         val bot = this.build()

@@ -14,7 +14,7 @@ import org.openqa.selenium.chrome.ChromeOptions
  * Создает и настраивает драйвер для работы с браузером Chrome с помощью Selenium.
  * Объект автоматически проверяет, открыт ли браузер, и пересоздает драйвер при необходимости.
  */
-object SeleniumManager {
+class SeleniumManager {
 
     /**
      * Экземпляр ChromeDriver.

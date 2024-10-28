@@ -1,6 +1,7 @@
 package org.example.parser.ozon
 
 import org.example.parser.Parser
+import org.example.parser.ParserConstants
 import org.example.parser.ShopName
 import org.example.parser.selenium.SeleniumManager
 import org.example.storage.models.Article
@@ -24,7 +25,7 @@ class OzonParserImpl(override val forceUpdate: Boolean = true) : Parser {
      */
     private lateinit var article: Article
 
-    private val seleniumManager = SeleniumManager
+    private val seleniumManager = SeleniumManager()
 
     /**
      * Возвращает информацию о товаре с указанного URL.
@@ -48,36 +49,34 @@ class OzonParserImpl(override val forceUpdate: Boolean = true) : Parser {
      */
     private fun parseArticle(articleUrl: URL) {
         try {
+
             println("Parsing page...")
 
             for (i in 1..10) {
                 println("Try $i ...")
                 seleniumManager.webDriver!!.get(articleUrl.toString())
-                sleep(500)
+                sleep(1000)
                 if (!seleniumManager.webDriver!!.pageSource?.contains("antibot")!! &&
                     seleniumManager.webDriver!!.pageSource?.isNotEmpty() == true &&
-                        !seleniumManager.webDriver!!.title?.lowercase()?.contains("antibot")!!
-                    ) {
-                    sleep(500)
+                    !seleniumManager.webDriver!!.title?.lowercase()?.contains("antibot")!!
+                ) {
+                    sleep(1000)
                     break
                 }
             }
 
-            val document: Document? = seleniumManager.webDriver!!.pageSource?.let {
+            val document: Document = seleniumManager.webDriver!!.pageSource!!.let {
                 Jsoup.parse(it)
             }
 
-            val nameString = document?.selectXpath("//*[@id=\"layoutPage\"]/div[1]/div[4]/div[3]/div[1]/div[1]/div[2]/div/div/div/div[1]/h1")?.text()
-            val priceString = document?.selectXpath("//*[@id=\"layoutPage\"]/div[1]/div[4]/div[3]/div[2]/div/div/div[1]/div[3]/div/div[1]/div/div/div[1]/div[1]/button/span/div/div[1]/div/div/span")
-                ?.text()
-            if (priceString != null) {
-                val price = BigDecimal(
-                    priceString.filter { it.isDigit() }
-                )
-                article = Article(price, nameString!!, ShopName.OZON, articleUrl.toString())
-            }
+            val nameString = document.selectXpath(ParserConstants.Ozon.ARTICLE_NAME.value).text()
+            val priceString = document.selectXpath(ParserConstants.Ozon.PRICE.value).text()
+            val price = BigDecimal(
+                priceString.filter { it.isDigit() }
+            )
+            article = Article(price, nameString, ShopName.OZON, articleUrl.toString())
         } catch (e: Exception) {
-            println(e)
+            println(e.printStackTrace())
             throw e
         } finally {
             seleniumManager.webDriver!!.quit()

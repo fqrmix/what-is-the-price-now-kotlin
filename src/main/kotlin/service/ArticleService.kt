@@ -5,6 +5,7 @@ import org.example.command.ParseArticleCommand
 import org.example.storage.models.Article
 import java.math.BigDecimal
 import java.net.URL
+import kotlinx.coroutines.*
 
 /**
  * Сервис для работы с товарами, обеспечивающий функции парсинга и проверки изменений цены.
@@ -17,8 +18,10 @@ class ArticleService {
      * @param url URL страницы товара.
      * @return Объект [Article], содержащий данные о товаре, или `null`, если парсинг не удался.
      */
-    fun parseArticle(url: URL): Article? {
-        return ParseArticleCommand().execute(url)
+    suspend fun parseArticle(url: URL): Article? {
+        return withContext(Dispatchers.IO) {
+            ParseArticleCommand().execute(url)
+        }
     }
 
     /**
@@ -28,12 +31,14 @@ class ArticleService {
      * @return Пара [Pair], где первый элемент - новая цена (если изменилась), а второй элемент - `true`,
      * если цена изменилась, или `false`, если осталась прежней.
      */
-    fun checkPriceChange(article: Article): Pair<BigDecimal?, Boolean> {
-        val newPrice = CheckArticlePriceCommand().execute(article)
-        return if (article.price > newPrice) {
-            Pair(newPrice, true) // Цена изменилась
-        } else {
-            Pair(null, false) // Цена осталась той же
+    suspend fun checkPriceChange(article: Article): Pair<BigDecimal?, Boolean> {
+        return withContext(Dispatchers.IO) {
+            val newPrice = CheckArticlePriceCommand().execute(article)
+             if (article.price > newPrice) {
+                Pair(newPrice, true) // Цена изменилась
+            } else {
+                Pair(null, false) // Цена осталась той же
+            }
         }
     }
 }
