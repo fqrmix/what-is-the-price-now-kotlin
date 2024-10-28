@@ -16,6 +16,7 @@ import org.example.service.SubscriptionService
 import org.example.service.TaskService
 import org.example.service.UserService
 import org.example.storage.Database
+import org.example.storage.models.Article
 import org.example.storage.models.Subscription
 import org.example.storage.models.Tariff
 import java.net.MalformedURLException
@@ -141,12 +142,16 @@ class ChatBot {
                     MessageTexts.SUBSCRIPTION_NOT_FOUND.text
                 } else {
                     currentSubscriptions.joinToString("\n") {
-                        "${it.article.name} : Цена = ${it.article.price}"
-                    }.let { "Ваши текущие подписки:\n$it" }
+                        "[${it.article.name}](${it.article.url})` | Цена: ${it.article.price}` руб.\n\n"
+                    }.let { "Ваши текущие подписки:\n\n$it" }
                 }
 
                 logSuccessOrError({
-                    bot.sendMessage(ChatId.fromId(chatId), text = subscriptionText)
+                    bot.sendMessage(
+                        ChatId.fromId(chatId),
+                        text = subscriptionText,
+                        parseMode = ParseMode.MARKDOWN
+                    )
                 })
 
                 update.consume()
@@ -274,7 +279,21 @@ class ChatBot {
                         return@message
                     }
 
-                    val article = articleService.parseArticle(url)
+                    var article: Article? = null
+
+                    try {
+                        bot.sendMessage(
+                            ChatId.fromId(chatId),
+                            text = "Пытаемся получить данные о товаре...",
+                        )
+                        article = articleService.parseArticle(url)
+                    } catch (e: Exception) {
+                        bot.sendMessage(
+                            ChatId.fromId(chatId),
+                            text = "При получении данных о товаре произошла ошибка. Попробуйте прислать ссылку еще раз.",
+                        )
+                    }
+
                     val user = userService.getUserById(chatId)
 
                     if (article != null) {
@@ -416,14 +435,18 @@ class ChatBot {
 
             when(callbackData[0]) {
                 "deletesub" -> {
-                    subscriptionService.deleteSubscription(callbackData[1].toLong())
-                    logSuccessOrError({
-                        bot.sendMessage(
-                            ChatId.fromId(chatId),
-                            text = "Подписка '${callbackData[1]}' удалена!",
-                            replyMarkup = createMainKeyboard()
-                        )
-                    })
+                    val sub = subscriptionService.getSubscription(callbackData[1].toLong())
+                    if (sub != null) {
+                        taskService.cancelTask(sub)
+                        subscriptionService.deleteSubscription(callbackData[1].toLong())
+                        logSuccessOrError({
+                            bot.sendMessage(
+                                ChatId.fromId(chatId),
+                                text = "Подписка на товар ${sub.article.name} удалена!",
+                                replyMarkup = createMainKeyboard()
+                            )
+                        })
+                    }
                 }
             }
         }

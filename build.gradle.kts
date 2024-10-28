@@ -8,6 +8,9 @@ version = "1.0-SNAPSHOT"
 repositories {
     mavenCentral()
     maven("https://jitpack.io")
+    maven {
+        url = uri("https://maven.pkg.github.com/ridthen/seleniumstealth4j")
+    }
 }
 
 dependencies {
@@ -18,6 +21,14 @@ dependencies {
 
     // https://mvnrepository.com/artifact/org.jsoup/jsoup
     implementation("org.jsoup:jsoup:1.18.1")
+
+    // Selenium
+    implementation("org.seleniumhq.selenium:selenium-java:4.25.0")
+//    implementation("com.github.ridthen:seleniumstealth4j:0.1")
+
+    // https://mvnrepository.com/artifact/com.google.code.gson/gson
+    implementation("com.google.code.gson:gson:2.11.0")
+
 
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:5.1.0")

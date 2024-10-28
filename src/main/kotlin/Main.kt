@@ -6,11 +6,12 @@ import org.example.service.TaskService
 
 fun main() {
     val chatBotEnvironment = ChatBot()
-    val bot = chatBotEnvironment.build()
-    bot.startPolling()
-
-    chatBotEnvironment.subscriptionService.getAllSubscriptions().forEach {
-        val user = chatBotEnvironment.userService.getUserById(it.userId)
-        TaskService.scheduleComparePriceTask(it, user, bot)
+    with(chatBotEnvironment) {
+        val bot = this.build()
+        bot.startPolling()
+        this.subscriptionService.getAllSubscriptions().forEach {
+            val user = chatBotEnvironment.userService.getUserById(it.userId)
+            TaskService.scheduleComparePriceTask(it, user, bot)
+        }
     }
 }

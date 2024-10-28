@@ -8,6 +8,7 @@ import org.example.storage.models.Subscription
 import org.example.storage.models.User
 import org.example.storage.repository.SubscriptionRepository
 import java.time.LocalDateTime
+import java.util.concurrent.ScheduledFuture
 
 /**
  * Сервис для управления задачами, связанными с отслеживанием изменений цен на товары
@@ -18,7 +19,7 @@ object TaskService {
     private val taskScheduler = Scheduler
     private val subscriptionRepository = SubscriptionRepository()
     private val subscriptionService = SubscriptionService()
-    private val scheduledTasks = mutableMapOf<Long, RunnableTask>()
+    private val scheduledTasks = mutableMapOf<Long, Pair<ScheduledFuture<*>, RunnableTask>>()
     private val articleService = ArticleService()
 
     /**
@@ -77,7 +78,16 @@ object TaskService {
      * @param subscription Подписка, для которой необходимо выполнить задачу.
      */
     fun executeTaskByNow(subscription: Subscription) {
-        scheduledTasks[subscription.id]?.let { this.taskScheduler.submitTask(it) }
+        scheduledTasks[subscription.id]?.let { this.taskScheduler.submitTask(it.second) }
+    }
+
+    /**
+     * Отменяет запланированную задачу
+     *
+     * @param subscription Подписка, задачу для которой нужно удалить.
+     */
+    fun cancelTask(subscription: Subscription) {
+        scheduledTasks[subscription.id]?.let { it.first.cancel(true) }
     }
 
     /**
@@ -90,7 +100,7 @@ object TaskService {
     private fun scheduleInternalTask(taskId: Long, task: RunnableTask, executionTime: LocalDateTime) {
         val newTask = taskScheduler.createScheduledTask(task, executionTime)
         if (newTask != null) {
-            scheduledTasks[taskId] = task
+            scheduledTasks[taskId] = Pair(newTask, task)
         }
     }
 }

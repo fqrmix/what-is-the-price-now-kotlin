@@ -23,6 +23,16 @@ class SubscriptionService {
     }
 
     /**
+     * Возвращает подписку по идентификатору.
+     *
+     * @param subId Идентификатор подписки.
+     * @return [Subscription] Объект подписки.
+     */
+    fun getSubscription(subId: Long): Subscription? {
+        return subscriptionRepository.getSubscriptionById(subId)
+    }
+
+    /**
      * Добавляет новую подписку и возвращает ее.
      *
      * @param subscription Объект [Subscription], который необходимо добавить.
