@@ -1,7 +1,9 @@
 package org.example.parser.selenium.stealth
 
 
+import org.openqa.selenium.WebDriver
 import org.openqa.selenium.chrome.ChromeDriver
+import org.openqa.selenium.chromium.ChromiumDriver
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.IOException
@@ -18,7 +20,7 @@ import java.util.Map
 class SeleniumStealth4j private constructor(builder: Builder) {
 
     private val wrapper: SeleniumStealthWrapper = SeleniumStealthWrapper()
-    private val webDriver: ChromeDriver = builder.webDriver
+    private val webDriver: ChromiumDriver = builder.webDriver
     private val userAgent: String
     private val languages: Array<String>
     private val vendor: String
@@ -35,7 +37,7 @@ class SeleniumStealth4j private constructor(builder: Builder) {
      * @property webDriver Экземпляр ChromeDriver, требуемый для инициализации `SeleniumStealth4j`.
      */
     class Builder(
-        internal val webDriver: ChromeDriver
+        internal val webDriver: ChromiumDriver
     ) {
         var userAgent: String = ""
         var languages: Array<String> = arrayOf()
@@ -164,7 +166,7 @@ class SeleniumStealth4j private constructor(builder: Builder) {
      * @param runOnInsecureOrigins включает работу на небезопасных ресурсах.
      */
     private fun stealth(
-        webDriver: ChromeDriver,
+        webDriver: ChromiumDriver,
         userAgent: String,
         languages: Array<String>,
         vendor: String,
@@ -201,7 +203,7 @@ class SeleniumStealth4j private constructor(builder: Builder) {
      * @param args параметры, передаваемые в файл JS.
      */
     @SafeVarargs
-    private fun <T> jsLoader(webDriver: ChromeDriver, jsFile: String, vararg args: T) {
+    private fun <T> jsLoader(webDriver: ChromiumDriver, jsFile: String, vararg args: T) {
         val inputStream = javaClass.classLoader.getResourceAsStream(jsFile)
         var pageFunction: String? = null
         try {
@@ -221,7 +223,7 @@ class SeleniumStealth4j private constructor(builder: Builder) {
      * @param uaLanguages строка, представляющая языковые настройки.
      * @param platform платформа браузера.
      */
-    private fun userAgentOverride(webDriver: ChromeDriver, userAgent: String, uaLanguages: String, platform: String) {
+    private fun userAgentOverride(webDriver: ChromiumDriver, userAgent: String, uaLanguages: String, platform: String) {
         var ua: String = if (userAgent == "") {
             webDriver.executeCdpCommand(
                 "Browser.getVersion",

@@ -1,6 +1,8 @@
 package org.example.parser.selenium.stealth
 
+import org.openqa.selenium.WebDriver
 import org.openqa.selenium.chrome.ChromeDriver
+import org.openqa.selenium.chromium.ChromiumDriver
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.util.*
@@ -50,7 +52,7 @@ class SeleniumStealthWrapper {
      * @param args аргументы для переданного JavaScript-кода.
      */
     @SafeVarargs
-    fun <T> evaluateOnNewDocument(webDriver: ChromeDriver, pageFunction: String, vararg args: T) {
+    fun <T> evaluateOnNewDocument(webDriver: ChromiumDriver, pageFunction: String, vararg args: T) {
         val jsCode = evaluationString(pageFunction, *args)
         webDriver.executeCdpCommand(
             "Page.addScriptToEvaluateOnNewDocument",

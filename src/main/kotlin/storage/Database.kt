@@ -11,7 +11,7 @@ object Database {
 
     fun connectToDatabase() {
         Database.connect(
-            url = "jdbc:postgresql://localhost:5432/postgres",
+            url = "jdbc:postgresql://postgres:5432/postgres",
             driver = "org.postgresql.Driver",
             user = "postgres",
             password = "mysecretpassword"

@@ -1,0 +1,65 @@
+version: '3'
+services:
+  what-is-the-price-now:
+#    image: "fqrmix/accounting-chat-manager-kotlin:latest"
+    build: .
+    container_name: what-is-the-price-now-kotlin
+    networks:
+      - postgres-network
+    env_file:
+      - .env
+    environment:
+      TZ: "Europe/Moscow"
+      TELEGRAM_TOKEN: "${TELEGRAM_TOKEN}"
+      POSTGRES_URL: "${POSTGRES_URL}"
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+    depends_on:
+     - postgres
+    command: ["java", "-jar", "app.jar"]
+
+  chrome:
+    image: selenium/standalone-chrome:latest
+    platform: linux/amd64
+    ports:
+      - "4444:4444"
+    container_name: standalone-chrome
+    hostname: standalone-chrome
+    networks:
+      - postgres-network
+    privileged: true
+    shm_size: 2g
+
+  postgres:
+    image: 'postgres:latest'
+    container_name: postgres
+    ports:
+      - "15432:5432"
+    env_file:
+      - .env
+    networks:
+      - postgres-network
+    volumes:
+      - /Users/svsergeev/Developer/my-projects/what-is-the-price-now-kotlin/db-data/:/var/lib/postgresql/data/
+#      - /Users/svsergeev/Developer/my-projects/what-is-the-price-now-kotlin/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  pgadmin:
+    image: dpage/pgadmin4
+    ports:
+      - "15433:80"
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+    networks:
+      - postgres-network
+    volumes:
+      - /Users/svsergeev/Developer/my-projects/what-is-the-price-now-kotlin/pgadmin-data/:/var/lib/pgadmin/
+
+#networks:
+#  docker-private-network:
+#    external: true
+
+networks:
+  postgres-network:
+    driver: bridge
