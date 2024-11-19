@@ -1,6 +1,6 @@
 services:
   what-is-the-price-now:
-#    image: "fqrmix/accounting-chat-manager-kotlin:latest"
+    image: "fqrmix/what-is-the-price-now-kotlin:latest"
     build: .
     container_name: what-is-the-price-now-kotlin
     networks:
@@ -27,8 +27,7 @@ services:
     networks:
       - postgres-network
     volumes:
-      - /Users/svsergeev/Developer/my-projects/what-is-the-price-now-kotlin/db-data/:/var/lib/postgresql/data/
-#      - /Users/svsergeev/Developer/my-projects/what-is-the-price-now-kotlin/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./db-data/:/var/lib/postgresql/data/
 
 #networks:
 #  docker-private-network:

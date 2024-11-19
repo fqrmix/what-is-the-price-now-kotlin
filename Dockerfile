@@ -1,5 +1,5 @@
 # Stage 1
-FROM gradle:8.4.0-jdk17 AS build
+FROM gradle:7.6.0-jdk17 AS build
 WORKDIR /app
 COPY . .
 RUN gradle fatJar --no-daemon
