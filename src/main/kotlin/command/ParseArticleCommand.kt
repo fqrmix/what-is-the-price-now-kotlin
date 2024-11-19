@@ -23,11 +23,9 @@ class ParseArticleCommand {
      * @return Объект [Article] с информацией о товаре, если удаётся определить магазин и получить данные, иначе `null`.
      */
     fun execute(url: URL): Article? {
-        val shopName = getShopNameByUrl(url)
-        if (shopName != null) {
-            parser = ParserFactory.make(shopName)
-            return parser.getArticleInfo(url)
-        } else return null
+        val shopName = getShopNameByUrl(url) ?: return null
+        parser = ParserFactory.make(shopName)
+        return parser.getArticleInfo(url)
     }
 
     /**
@@ -39,8 +37,12 @@ class ParseArticleCommand {
     private fun getShopNameByUrl(url: URL): ShopName? {
         return when(url.host) {
             "www.vinylbox.ru", "vinylbox.ru" -> ShopName.VINYLBOX
-            "www.ozon.ru", "ozon.ru" -> ShopName.OZON
-            "market.yandex.ru", "www.market.yandex.ru" -> ShopName.YANDEXMARKET
+//            "www.ozon.ru", "ozon.ru" -> ShopName.OZON
+//            "market.yandex.ru", "www.market.yandex.ru" -> ShopName.YANDEXMARKET
+            "plastinka.com", "www.platinka.com" -> ShopName.PLASTINKACOM
+            "doctorhead.ru", "www.doctorhead.ru" -> ShopName.DRHEAD
+            "pult.ru", "www.pult.ru" -> ShopName.PULTRU
+            "korobkavinyla.ru", "www.korobkavinyla.ru" -> ShopName.KOROBKAVINILA
             else -> {
                 return null
             }

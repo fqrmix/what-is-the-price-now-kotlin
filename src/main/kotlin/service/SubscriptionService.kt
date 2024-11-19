@@ -54,6 +54,15 @@ class SubscriptionService {
     }
 
     /**
+     * Обновляет подписку до состояния переданного объекта.
+     *
+     * @param subscription Объект подписки.
+     */
+    fun updateSubscription(subscription: Subscription) {
+        subscriptionRepository.updateSubscription(subscription)
+    }
+
+    /**
      * Удаляет подписку по указанному идентификатору.
      *
      * @param subscriptionId Идентификатор подписки, которую необходимо удалить.

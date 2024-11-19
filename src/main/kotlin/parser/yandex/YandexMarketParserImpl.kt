@@ -2,7 +2,6 @@ package org.example.parser.yandex
 
 import org.example.parser.Parser
 import org.example.parser.ParserConstants
-import org.example.parser.ShopName
 import org.example.storage.models.Article
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
@@ -51,7 +50,7 @@ class YandexMarketParserImpl(override val forceUpdate: Boolean = true) : Parser 
             val price = BigDecimal(
                 priceString.filter { it.isDigit() }
             )
-            article = Article(price, nameString, ShopName.YANDEXMARKET, articleUrl.toString())
+//            article = Article(price, nameString, ShopName.YANDEXMARKET, articleUrl.toString())
         } catch (e: Exception) {
             println(e.printStackTrace())
             throw e

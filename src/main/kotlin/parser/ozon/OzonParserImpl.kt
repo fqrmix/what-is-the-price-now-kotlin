@@ -1,8 +1,8 @@
 package org.example.parser.ozon
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.example.parser.Parser
 import org.example.parser.ParserConstants
-import org.example.parser.ShopName
 import org.example.parser.selenium.SeleniumManager
 import org.example.storage.models.Article
 import org.jsoup.Jsoup
@@ -18,6 +18,10 @@ import java.net.URL
  * @property forceUpdate Если `true`, будет обновлять информацию о товаре каждый раз при вызове [getArticleInfo].
  */
 class OzonParserImpl(override val forceUpdate: Boolean = true) : Parser {
+
+    companion object {
+        val logger = KotlinLogging.logger {}
+    }
 
     /**
      * Объект [Article], содержащий информацию о товаре. Инициализируется при первом запросе информации о товаре
@@ -74,9 +78,9 @@ class OzonParserImpl(override val forceUpdate: Boolean = true) : Parser {
             val price = BigDecimal(
                 priceString.filter { it.isDigit() }
             )
-            article = Article(price, nameString, ShopName.OZON, articleUrl.toString())
+//            article = Article(price, nameString, ShopName.OZON, articleUrl.toString())
         } catch (e: Exception) {
-            println(e.printStackTrace())
+            logger.error { e.printStackTrace() }
             throw e
         } finally {
             seleniumManager.webDriver!!.quit()

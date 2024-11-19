@@ -1,0 +1,38 @@
+services:
+  what-is-the-price-now:
+    image: "fqrmix/what-is-the-price-now-kotlin:latest"
+    build: .
+    container_name: what-is-the-price-now-kotlin
+    networks:
+      - postgres-network
+    env_file:
+      - .env
+    environment:
+      TZ: "Europe/Moscow"
+      TELEGRAM_TOKEN: "${TELEGRAM_TOKEN}"
+      POSTGRES_URL: "${POSTGRES_URL}"
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+    depends_on:
+     - postgres
+    command: ["java", "-jar", "app.jar"]
+
+  postgres:
+    image: 'postgres:latest'
+    container_name: postgres
+#    ports:
+#      - "15432:5432"
+    env_file:
+      - .env
+    networks:
+      - postgres-network
+    volumes:
+      - ./db-data/:/var/lib/postgresql/data/
+
+#networks:
+#  docker-private-network:
+#    external: true
+
+networks:
+  postgres-network:
+    driver: bridge

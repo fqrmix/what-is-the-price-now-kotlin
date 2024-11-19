@@ -14,12 +14,11 @@ import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import org.example.common.MessageTexts
-import org.example.service.ArticleService
-import org.example.service.SubscriptionService
-import org.example.service.TaskService
-import org.example.service.UserService
+import org.example.org.example.bot.ChatContext
+import org.example.service.*
 import org.example.storage.Database
 import org.example.storage.models.Article
+import org.example.storage.models.FeedbackMessage
 import org.example.storage.models.Subscription
 import org.example.storage.models.Tariff
 import java.net.MalformedURLException
@@ -27,7 +26,6 @@ import java.net.URL
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeParseException
-import kotlin.concurrent.thread
 
 /**
  * Класс, представляющий чат-бота.
@@ -41,10 +39,11 @@ class ChatBot {
     val userService = UserService()
     val subscriptionService = SubscriptionService()
     val taskService = TaskService
+    val feedbackService = FeedbackService()
 
     companion object {
         val logger = KotlinLogging.logger {}
-        private const val TOKEN = "5316952420:AAEE9F4utvw3IwrfNEBsXcCwM6DTb6joOQA"
+        private val TOKEN = System.getenv("TELEGRAM_TOKEN")
         private const val TIMEOUT_TIME = 30
     }
 
@@ -55,7 +54,8 @@ class ChatBot {
         NONE,
         ARTICLE_AWAITING_TIME_TO_NOTIFY,
         ARTICLE_AWAITING_LINK,
-        NOTIFICATION_AWAITING_TIME_TO_NOTIFY
+        NOTIFICATION_AWAITING_TIME_TO_NOTIFY,
+        FEEDBACK_AWAITING_MESSAGE
     }
 
     /**
@@ -77,6 +77,7 @@ class ChatBot {
                 handleRemoveSubscription()
                 handleCheckPriceNow()
                 handleSupportProject()
+                handleFeedback()
                 handleCallbackQuery()
             }
         }
@@ -92,7 +93,7 @@ class ChatBot {
             keyboard = listOf(
                 listOf(
                     KeyboardButton("Добавить товар"),
-                    KeyboardButton("Удалить товар")
+                    KeyboardButton("Настроить уведомления")
                 ),
                 listOf(
                     KeyboardButton("Список товаров"),
@@ -100,7 +101,7 @@ class ChatBot {
                 ),
                 listOf(
                     KeyboardButton("Поддержать проект"),
-                    KeyboardButton("Настроить уведомления")
+                    KeyboardButton("Обратная связь")
                 )
             ),
             resizeKeyboard = true
@@ -123,7 +124,8 @@ class ChatBot {
                     bot.sendMessage(
                         ChatId.fromId(chatId),
                         text = MessageTexts.MAIN_MENU.text,
-                        replyMarkup = createMainKeyboard()
+                        replyMarkup = createMainKeyboard(),
+                        parseMode = ParseMode.MARKDOWN
                     )
                 })
                 update.consume()
@@ -142,22 +144,43 @@ class ChatBot {
             if (text == "Список товаров") {
                 userStates[chatId] = UserState.NONE
                 val currentSubscriptions = subscriptionService.getUserSubscriptions(chatId)
-                val subscriptionText = if (currentSubscriptions.isEmpty()) {
-                    MessageTexts.SUBSCRIPTION_NOT_FOUND.text
+                if (currentSubscriptions.isEmpty()) {
+                    logSuccessOrError({
+                        bot.sendMessage(
+                            ChatId.fromId(chatId),
+                            text = MessageTexts.SUBSCRIPTION_NOT_FOUND.text,
+                            parseMode = ParseMode.MARKDOWN
+                        )
+                    })
+
                 } else {
-                    currentSubscriptions.joinToString("\n") {
-                        "[${it.article.name}](${it.article.url})` | Цена: ${it.article.price}` руб.\n\n"
-                    }.let { "Ваши текущие подписки:\n\n$it" }
+                    logSuccessOrError({
+                        bot.sendMessage(
+                            ChatId.fromId(chatId),
+                            text = "Ваши текущие подписки:",
+                            parseMode = ParseMode.MARKDOWN
+                        )
+                    })
+
+                    currentSubscriptions.forEach {
+
+                        val deleteButton = InlineKeyboardMarkup.create(
+                            listOf(InlineKeyboardButton.CallbackData(
+                                text = "Удалить",
+                                callbackData = "deletesub_" + it.id.toString()
+                            ))
+                        )
+
+                        logSuccessOrError({
+                            bot.sendMessage(
+                                ChatId.fromId(chatId),
+                                text =  "[${it.article.name}](${it.article.url})` | Цена: ${it.article.price} руб.`\n\n",
+                                parseMode = ParseMode.MARKDOWN,
+                                replyMarkup = deleteButton
+                            )
+                        })
+                    }
                 }
-
-                logSuccessOrError({
-                    bot.sendMessage(
-                        ChatId.fromId(chatId),
-                        text = subscriptionText,
-                        parseMode = ParseMode.MARKDOWN
-                    )
-                })
-
                 update.consume()
             }
         }
@@ -187,6 +210,15 @@ class ChatBot {
                     val userLocalTime = LocalTime.parse(text)
                     user.timeToNotify = userLocalTime
                     userService.updateUserInfo(user)
+                    val subs = subscriptionService.getUserSubscriptions(user.id)
+                    subs.forEach {
+                        it.nextExecutionTime = it.nextExecutionTime.withHour(userLocalTime.hour)
+                            .withMinute(userLocalTime.minute)
+                        subscriptionService.updateSubscription(it)
+                        taskService.cancelTask(it)
+                        taskService.scheduleComparePriceTask(it, user, bot)
+                    }
+
                     userStates[chatId] = UserState.NONE
                     bot.sendMessage(
                         ChatId.fromId(chatId),
@@ -209,146 +241,158 @@ class ChatBot {
         }
     }
 
+    private fun handleAddArticle(chatContext: ChatContext) {
+        if (chatContext.text == "Добавить товар") {
+            val user = userService.getUserById(chatContext.chatId)
+            val userSubscriptions = subscriptionService.getUserSubscriptions(user.id)
+
+            if (userSubscriptions.size >= 4) {
+                logSuccessOrError({
+                    chatContext.bot.sendMessage(
+                        ChatId.fromId(chatContext.chatId),
+                        text = "На текущий момент у вас уже добавлено максимальное количество товаров",
+                    )
+                })
+                return
+            }
+
+            val timeToNotify = user.timeToNotify
+
+            if (timeToNotify != null) {
+                logSuccessOrError({
+                    chatContext.bot.sendMessage(
+                        ChatId.fromId(chatContext.chatId),
+                        text = MessageTexts.AWAITING_FOR_LINK.text,
+                        replyMarkup = KeyboardReplyMarkup(
+                            keyboard = listOf(
+                                listOf(KeyboardButton("Вернуться в меню"))
+                            )
+                        )
+                    )
+                })
+                userStates[chatContext.chatId] = UserState.ARTICLE_AWAITING_LINK
+            } else {
+                logSuccessOrError({
+                    chatContext.bot.sendMessage(
+                        ChatId.fromId(chatContext.chatId),
+                        text = "Пришлите время для уведомления в формате - HH:MM",
+                        replyMarkup = createMainKeyboard()
+                    )
+                })
+                userStates[chatContext.chatId] = UserState.ARTICLE_AWAITING_TIME_TO_NOTIFY
+            }
+        }
+    }
+
+    private fun handleTimeToNotify(chatContext: ChatContext) {
+        val user = userService.getUserById(chatContext.chatId)
+        try {
+            val userLocalTime = LocalTime.parse(chatContext.text)
+            user.timeToNotify = userLocalTime
+            userService.updateUserInfo(user)
+            userStates[chatContext.chatId] = UserState.ARTICLE_AWAITING_LINK
+            chatContext.bot.sendMessage(ChatId.fromId(chatContext.chatId), text = MessageTexts.AWAITING_FOR_LINK.text)
+        } catch (e: DateTimeParseException) {
+            chatContext.bot.sendMessage(ChatId.fromId(chatContext.chatId), text = "Ошибка! Невереный формат времени!")
+        }
+    }
+
+    @OptIn(DelicateCoroutinesApi::class)
+    private fun handleArticleLink(chatContext: ChatContext) {
+        GlobalScope.launch {
+            val url: URL?
+            try {
+                url = URL(chatContext.text)
+            } catch (e: MalformedURLException) {
+                chatContext.bot.sendMessage(ChatId.fromId(chatContext.chatId), text = MessageTexts.Error.URL_IS_MALFORMED.text)
+                return@launch
+            }
+
+            val article: Article?
+
+            try {
+                chatContext.bot.sendMessage(
+                    ChatId.fromId(chatContext.chatId),
+                    text = "Пытаемся получить данные о товаре...",
+                )
+                article = articleService.parseArticle(url)
+            } catch (e: Exception) {
+                chatContext.bot.sendMessage(
+                    ChatId.fromId(chatContext.chatId),
+                    text = "При получении данных о товаре произошла ошибка. Попробуйте прислать ссылку еще раз.",
+                )
+                return@launch
+            }
+
+            val user = userService.getUserById(chatContext.chatId)
+
+            if (article != null) {
+                var nextExecutionTime = user.timeToNotify?.let {
+                    LocalDateTime.now()
+                        .withHour(it.hour)
+                        .withMinute(it.minute)
+                        .withSecond(0)
+                }
+
+                if (nextExecutionTime != null) {
+                    if (nextExecutionTime < LocalDateTime.now()) {
+                        nextExecutionTime = nextExecutionTime.plusHours(24)
+                    }
+
+                    val subscription = subscriptionService.addSubscription(
+                        Subscription(
+                            id = 0,
+                            userId = chatContext.chatId,
+                            article = article,
+                            createdTime = LocalDateTime.now(),
+                            nextExecutionTime = nextExecutionTime!!
+                        )
+                    )
+
+                    taskService.scheduleComparePriceTask(subscription, user, chatContext.bot)
+                    logSuccessOrError({
+                        chatContext.bot.sendMessage(
+                            ChatId.fromId(chatContext.chatId),
+                            text = MessageTexts.SUBSCRIPTION_ADDED.text,
+                            replyMarkup = createMainKeyboard()
+                        )
+                    })
+
+                    // Сбрасываем состояние
+                    userStates[chatContext.chatId] = UserState.NONE
+                }
+
+            } else {
+                chatContext.bot.sendMessage(ChatId.fromId(chatContext.chatId), text = MessageTexts.Error.SHOP_NOT_SUPPORTED.text)
+            }
+        }
+    }
+
     /**
      * Обрабатывает команду "Добавить товар" и добавляет новый товар в подписки пользователя.
      */
-    @OptIn(DelicateCoroutinesApi::class)
     private fun Dispatcher.handleAddSubscription() {
         message {
             val chatId = update.message?.chat?.id ?: return@message
             val text = update.message?.text ?: return@message
 
+            val chatContext = ChatContext(chatId, text, bot)
+
             when (userStates[chatId]) {
                 UserState.NONE -> {
-                    if (text == "Добавить товар") {
-                        val user = userService.getUserById(chatId)
-                        val userSubscriptions = subscriptionService.getUserSubscriptions(user.id)
-
-                        if (userSubscriptions.size >= 2) {
-                            logSuccessOrError({
-                                bot.sendMessage(
-                                    ChatId.fromId(chatId),
-                                    text = "На текущий момент у вас уже добавлено максимальное количество товаров",
-                                )
-                            })
-                            return@message
-                        }
-
-                        val timeToNotify = user.timeToNotify
-
-                        if (timeToNotify != null) {
-                            logSuccessOrError({
-                                bot.sendMessage(
-                                    ChatId.fromId(chatId),
-                                    text = MessageTexts.AWAITING_FOR_LINK.text,
-                                    replyMarkup = KeyboardReplyMarkup(
-                                        keyboard = listOf(
-                                            listOf(KeyboardButton("Вернуться в меню"))
-                                        )
-                                    )
-                                )
-                            })
-                            userStates[chatId] = UserState.ARTICLE_AWAITING_LINK
-                        } else {
-                            logSuccessOrError({
-                                bot.sendMessage(
-                                    ChatId.fromId(chatId),
-                                    text = "Пришлите время для уведомления в формате - HH:MM",
-                                    replyMarkup = createMainKeyboard()
-                                )
-                            })
-                            userStates[chatId] = UserState.ARTICLE_AWAITING_TIME_TO_NOTIFY
-                        }
-                    }
+                    handleAddArticle(chatContext)
                 }
 
                 UserState.ARTICLE_AWAITING_TIME_TO_NOTIFY -> {
-                    val user = userService.getUserById(chatId)
-                    try {
-                        val userLocalTime = LocalTime.parse(text)
-                        user.timeToNotify = userLocalTime
-                        userService.updateUserInfo(user)
-                        userStates[chatId] = UserState.ARTICLE_AWAITING_LINK
-                        bot.sendMessage(ChatId.fromId(chatId), text = MessageTexts.AWAITING_FOR_LINK.text)
-                    } catch (e: DateTimeParseException) {
-                        bot.sendMessage(ChatId.fromId(chatId), text = "Ошибка! Невереный формат времени!")
-                    }
+                    handleTimeToNotify(chatContext)
                 }
 
                 UserState.ARTICLE_AWAITING_LINK -> {
-                    GlobalScope.launch {
-                        val url: URL?
-                        try {
-                            url = URL(text)
-                        } catch (e: MalformedURLException) {
-                            bot.sendMessage(ChatId.fromId(chatId), text = MessageTexts.Error.URL_IS_MALFORMED.text)
-                            return@launch
-                        }
-
-                        val article: Article?
-
-                        try {
-                            bot.sendMessage(
-                                ChatId.fromId(chatId),
-                                text = "Пытаемся получить данные о товаре...",
-                            )
-
-                            article = articleService.parseArticle(url)
-
-
-                        } catch (e: Exception) {
-                            bot.sendMessage(
-                                ChatId.fromId(chatId),
-                                text = "При получении данных о товаре произошла ошибка. Попробуйте прислать ссылку еще раз.",
-                            )
-                            return@launch
-                        }
-
-                        val user = userService.getUserById(chatId)
-
-                        if (article != null) {
-                            var nextExecutionTime = user.timeToNotify?.let {
-                                LocalDateTime.now()
-                                    .withHour(it.hour)
-                                    .withMinute(it.minute)
-                                    .withSecond(0)
-                            }
-
-                            if (nextExecutionTime != null) {
-                                if (nextExecutionTime < LocalDateTime.now()) {
-                                    nextExecutionTime = nextExecutionTime.plusHours(24)
-                                }
-
-                                val subscription = subscriptionService.addSubscription(
-                                    Subscription(
-                                        id = 0,
-                                        userId = chatId,
-                                        article = article,
-                                        createdTime = LocalDateTime.now(),
-                                        nextExecutionTime = nextExecutionTime!!
-                                    )
-                                )
-                                taskService.scheduleComparePriceTask(subscription, user, bot)
-                                logSuccessOrError({
-                                    bot.sendMessage(
-                                        ChatId.fromId(chatId),
-                                        text = MessageTexts.SUBSCRIPTION_ADDED.text,
-                                        replyMarkup = createMainKeyboard()
-                                    )
-                                })
-
-                                // Сбрасываем состояние
-                                userStates[chatId] = UserState.NONE
-                            }
-
-                        } else {
-                            bot.sendMessage(ChatId.fromId(chatId), text = MessageTexts.Error.SHOP_NOT_SUPPORTED.text)
-                        }
-                    }
+                    handleArticleLink(chatContext)
                 }
 
                 else -> {
-                    bot.sendMessage(ChatId.fromId(chatId), text = MessageTexts.Error.UNKNOWN_COMMAND.text)
+//                    bot.sendMessage(ChatId.fromId(chatId), text = MessageTexts.Error.UNKNOWN_COMMAND.text)
                 }
             }
         }
@@ -364,37 +408,43 @@ class ChatBot {
             val text = update.message?.text ?: return@message
 
             if (text == "Узнать цену сейчас") {
-                GlobalScope.launch {
-                    userStates[chatId] = UserState.NONE
-                    val currentSubscriptions = subscriptionService.getUserSubscriptions(chatId)
-                    if (currentSubscriptions.isEmpty()) {
-                        logSuccessOrError({
-                            bot.sendMessage(ChatId.fromId(chatId), text = MessageTexts.SUBSCRIPTION_NOT_FOUND.text)
-                        })
-                        return@launch
-                    }
-                    var message = ""
-                    currentSubscriptions.forEach {
+                userStates[chatId] = UserState.NONE
+                val currentSubscriptions = subscriptionService.getUserSubscriptions(chatId)
+                if (currentSubscriptions.isEmpty()) {
+                    logSuccessOrError({
+                        bot.sendMessage(ChatId.fromId(chatId), text = MessageTexts.SUBSCRIPTION_NOT_FOUND.text)
+                    })
+                    return@message
+                }
+                currentSubscriptions.forEach {
+                    GlobalScope.launch {
                         val (newPrice, isChanged) = articleService.checkPriceChange(it.article)
                         if (isChanged) {
                             subscriptionService.updateSubscriptionArticlePrice(it, newPrice!!)
-                            message += "Цена на ${it.article.name} изменилась! " +
-                                    "Старая цена: ${it.article.price} " +
-                                    "Новая цена: ${newPrice}\n"
+                            logSuccessOrError({
+                                bot.sendMessage(
+                                    ChatId.fromId(chatId),
+                                    text = "Цена на [${it.article.name}](${it.article.url}) изменилась! " +
+                                            "Старая цена: `${it.article.price}`\n" +
+                                            "Новая цена: `${newPrice}`\n",
+                                    parseMode = ParseMode.MARKDOWN,
+                                    replyMarkup = createMainKeyboard()
+                                )
+                            })
                         } else {
-                            message += "Цена на ${it.article.name} не изменилась!\n"
+                            logSuccessOrError({
+                                bot.sendMessage(
+                                    ChatId.fromId(chatId),
+                                    text = "Цена на [${it.article.name}](${it.article.url}) не изменилась! " +
+                                            "Стоимость: `${it.article.price} руб.`\n",
+                                    parseMode = ParseMode.MARKDOWN,
+                                    replyMarkup = createMainKeyboard()
+                                )
+                            })
                         }
                     }
-
-                    logSuccessOrError({
-                        bot.sendMessage(
-                            ChatId.fromId(chatId),
-                            text = message,
-                            replyMarkup = createMainKeyboard()
-                        )
-                    })
-                    update.consume()
                 }
+                update.consume()
             }
         }
     }
@@ -433,6 +483,8 @@ class ChatBot {
                         replyMarkup = inlineKeyboard
                     )
                 })
+
+                handleSubCommand()
             }
         }
     }
@@ -479,10 +531,53 @@ class ChatBot {
                 logSuccessOrError({
                     bot.sendMessage(
                         ChatId.fromId(chatId),
-                        text = "Поддержать проект: \"https://yoomoney.ru/main\""
+                        text = MessageTexts.SUPPORT_PROJECT.text,
+                        parseMode = ParseMode.MARKDOWN
                     )
                 })
                 update.consume()
+            }
+        }
+    }
+
+    /**
+     * Обрабатывает команду "Обратная связь".
+     */
+    private fun Dispatcher.handleFeedback() {
+        message {
+            val chatId = update.message?.chat?.id ?: return@message
+            val text = update.message?.text ?: return@message
+
+            if (text == "Обратная связь" && userStates[chatId] == UserState.NONE) {
+                userStates[chatId] = UserState.FEEDBACK_AWAITING_MESSAGE
+                logSuccessOrError({
+                    bot.sendMessage(
+                        ChatId.fromId(chatId),
+                        text = MessageTexts.FEEDBACK.text,
+                        parseMode = ParseMode.MARKDOWN,
+                        replyMarkup = KeyboardReplyMarkup(
+                            keyboard = listOf(
+                                listOf(KeyboardButton("Вернуться в меню"))
+                            )
+                        )
+
+                    )
+                })
+                update.consume()
+            } else if (userStates[chatId] == UserState.FEEDBACK_AWAITING_MESSAGE) {
+                feedbackService.addFeedbackMessage(
+                    FeedbackMessage(id = 0, userId = chatId, message = text)
+                )
+                userStates[chatId] = UserState.NONE
+                update.consume()
+                logSuccessOrError({
+                    bot.sendMessage(
+                        ChatId.fromId(chatId),
+                        text = MessageTexts.FEEDBACK_SUCCESS.text,
+                        parseMode = ParseMode.MARKDOWN,
+                        replyMarkup = createMainKeyboard()
+                    )
+                })
             }
         }
     }

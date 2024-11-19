@@ -3,14 +3,11 @@ plugins {
 }
 
 group = "org.example"
-version = "1.0-SNAPSHOT"
+version = "1.0"
 
 repositories {
     mavenCentral()
     maven("https://jitpack.io")
-    maven {
-        url = uri("https://maven.pkg.github.com/ridthen/seleniumstealth4j")
-    }
 }
 
 dependencies {
@@ -24,11 +21,12 @@ dependencies {
 
     // Selenium
     implementation("org.seleniumhq.selenium:selenium-java:4.25.0")
-//    implementation("com.github.ridthen:seleniumstealth4j:0.1")
 
     // https://mvnrepository.com/artifact/com.google.code.gson/gson
     implementation("com.google.code.gson:gson:2.11.0")
 
+    // https://mvnrepository.com/artifact/io.github.bonigarcia/webdrivermanager
+    implementation("io.github.bonigarcia:webdrivermanager:5.9.2")
 
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:5.1.0")
@@ -46,6 +44,21 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
 }
+
+tasks.register("fatJar", Jar::class.java) {
+    archiveClassifier.set("all")
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes("Main-Class" to "org.example.MainKt")
+    }
+    from(configurations.runtimeClasspath.get()
+        .onEach { println("add from dependencies: ${it.name}") }
+        .map { if (it.isDirectory) it else zipTree(it) })
+    val sourcesMain = sourceSets.main.get()
+    sourcesMain.allSource.forEach { println("add from sources: ${it.name}") }
+    from(sourcesMain.output)
+}
+
 kotlin {
     jvmToolchain(17)
 }
