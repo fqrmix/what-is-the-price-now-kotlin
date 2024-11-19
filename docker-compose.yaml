@@ -19,7 +19,7 @@ services:
 
   postgres:
     image: 'postgres:latest'
-    container_name: postgres
+    container_name: what-is-the-price-now-postgres
 #    ports:
 #      - "15432:5432"
     env_file:
