@@ -1,6 +1,5 @@
 package org.example.parser.selenium
 
-import io.github.bonigarcia.wdm.WebDriverManager
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.example.parser.selenium.stealth.SeleniumStealth4j
 import org.openqa.selenium.PageLoadStrategy
@@ -9,9 +8,6 @@ import org.openqa.selenium.WebDriverException
 import org.openqa.selenium.chrome.ChromeDriver
 import org.openqa.selenium.chrome.ChromeOptions
 import org.openqa.selenium.chromium.ChromiumDriver
-import org.openqa.selenium.remote.DesiredCapabilities
-import org.openqa.selenium.remote.RemoteWebDriver
-import java.net.URL
 
 
 /**
@@ -83,17 +79,18 @@ class SeleniumManager {
             chromeOptions.addArguments("--data-path=/tmp")
             chromeOptions.addArguments("--disk-cache-dir=/tmp")
             chromeOptions.addArguments("--remote-debugging-port=9222")
-//            chromeOptions.setBinary("/opt/chrome/chrome")
-//            System.setProperty("webdriver.chrome.driver", "/usr/local/bin/chromedriver")
+            chromeOptions.setBinary("/opt/chrome-linux64/chrome")
+            System.setProperty("webdriver.chrome.driver", "/opt/chromedriver-linux64/chromedriver")
 
-//            webDriver = ChromeDriver(chromeOptions)
-            val capabilities = DesiredCapabilities();
-            capabilities.setCapability(ChromeOptions.CAPABILITY, chromeOptions)
+            webDriver = ChromeDriver(chromeOptions)
+//            val capabilities = DesiredCapabilities();
+//            capabilities.setCapability(ChromeOptions.CAPABILITY, chromeOptions)
 
-            WebDriverManager.chromedriver()
-                .capabilities(capabilities)
-                .remoteAddress("http://standalone-chrome:4444/wd/hub")
-                .create()
+//            WebDriverManager.chromedriver()
+//                .capabilities(capabilities)
+//                .remoteAddress("http://standalone-chrome:4444/wd/hub")
+//                .create()
+
 
 //            webDriver = RemoteWebDriver(URL("http://standalone-chrome:4444/wd/hub"), capabilities) as ChromiumDriver
 
@@ -105,7 +102,7 @@ class SeleniumManager {
                 .languages(arrayOf("en-US", "en"))
                 .vendor("Google Inc.")
                 .platform("Win32")
-                //                .webglVendor("Intel Inc.")
+                //       2         .webglVendor("Intel Inc.")
                 //                .renderer("Intel Iris OpenGL Engine")
                 //                .fixHairline(true)
                 //                .runOnInsecureOrigins(false)

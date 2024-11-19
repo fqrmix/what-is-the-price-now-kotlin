@@ -2,6 +2,7 @@ package org.example.service
 
 import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.entities.ChatId
+import com.github.kotlintelegrambot.entities.ParseMode
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -39,6 +40,7 @@ object TaskService {
                 .withHour(it.hour)
                 .withMinute(it.minute)
                 .withSecond(0)
+                .withNano(0)
         }
 
         // Если следующее время выполнения уже прошло, добавляем 24 часа
@@ -59,12 +61,13 @@ object TaskService {
                                     "Старая цена: ${subscription.article.price} " +
                                     "Новая цена: ${newPrice}\n"
                         } else {
-                            message += "Цена на ${subscription.article.name} не изменилась!\n"
+                            message += "Цена на [${subscription.article.name}](${subscription.article.url}) не изменилась! Стоимость: `${subscription.article.price} руб.`\n"
                         }
 
                         bot.sendMessage(
                             ChatId.fromId(user.id),
-                            text = message
+                            text = message,
+                            parseMode = ParseMode.MARKDOWN
                         )
                     } catch (e: Exception) {
                         println(e.stackTrace)
@@ -74,7 +77,7 @@ object TaskService {
                     scheduleComparePriceTask(subscription, user, bot)
                 }
             },
-            subscription.nextExecutionTime
+            nextExecutionTime
         )
     }
 
@@ -93,7 +96,7 @@ object TaskService {
      * @param subscription Подписка, задачу для которой нужно удалить.
      */
     fun cancelTask(subscription: Subscription) {
-        scheduledTasks[subscription.id]?.let { it.first.cancel(true) }
+        scheduledTasks[subscription.id]?.first?.cancel(true)
     }
 
     /**

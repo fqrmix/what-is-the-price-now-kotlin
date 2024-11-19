@@ -40,3 +40,8 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+### Docker ###
+/db-data/
+/pgadmin-data/
+*.env

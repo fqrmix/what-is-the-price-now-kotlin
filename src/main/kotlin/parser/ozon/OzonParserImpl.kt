@@ -3,7 +3,6 @@ package org.example.parser.ozon
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.example.parser.Parser
 import org.example.parser.ParserConstants
-import org.example.parser.ShopName
 import org.example.parser.selenium.SeleniumManager
 import org.example.storage.models.Article
 import org.jsoup.Jsoup
@@ -79,7 +78,7 @@ class OzonParserImpl(override val forceUpdate: Boolean = true) : Parser {
             val price = BigDecimal(
                 priceString.filter { it.isDigit() }
             )
-            article = Article(price, nameString, ShopName.OZON, articleUrl.toString())
+//            article = Article(price, nameString, ShopName.OZON, articleUrl.toString())
         } catch (e: Exception) {
             logger.error { e.printStackTrace() }
             throw e
