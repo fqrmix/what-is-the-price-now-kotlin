@@ -34,7 +34,7 @@ class ArticleService {
     suspend fun checkPriceChange(article: Article): Pair<BigDecimal?, Boolean> {
         return withContext(Dispatchers.IO) {
             val newPrice = CheckArticlePriceCommand().execute(article)
-             if (article.price > newPrice) {
+             if (article.price != newPrice) {
                 Pair(newPrice, true) // Цена изменилась
             } else {
                 Pair(null, false) // Цена осталась той же
