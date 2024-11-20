@@ -40,15 +40,33 @@ src
 │   │   │   ├── CheckArticlePriceCommand.kt # Команда для проверки обновлений цен
 │   │   │   └── ParseArticleCommand.kt      # Команда для парсинга новых товаров
 │   │   ├── common
-│   │   │   ├── MessageTexts.kt             # Общие сообщения бота
-│   │   │   ├── RunnableTask.kt             # Базовый класс для задач
-│   │   │   └── Scheduler.kt                # Планировщик и управление задачами
+│   │   │   ├── EventTracker.kt            # Отслеживание событий в системе
+│   │   │   ├── MessageTexts.kt            # Общие сообщения бота
+│   │   │   ├── RunnableTask.kt            # Базовый класс для задач
+│   │   │   ├── Scheduler.kt               # Планировщик и управление задачами
+│   │   │   └── state
+│   │   │       ├── ArticleUserState.kt       # Состояние пользователя для работы с товарами
+│   │   │       ├── FeedbackUserState.kt      # Состояние пользователя для обратной связи
+│   │   │       ├── NotificationUserState.kt  # Состояние пользователя для уведомлений
+│   │   │       └── UserState.kt              # Общий класс состояния пользователя
+│   │   ├── org
+│   │   │   └── example
+│   │   │       └── bot
+│   │   │           └── ChatContext.kt       # Контекст общения с пользователем
 │   │   ├── parser
 │   │   │   ├── Parser.kt                   # Базовый интерфейс для парсеров
 │   │   │   ├── ParserConstants.kt          # Константы для логики парсинга
 │   │   │   ├── ParserFactory.kt            # Фабрика для создания парсеров
+│   │   │   ├── drhead
+│   │   │   │   └── DrHeadParserImpl.kt     # Реализация парсера для DrHead
+│   │   │   ├── korobkavinila
+│   │   │   │   └── KorobkaVinilaParserImpl.kt # Реализация парсера для Коробка Винила
 │   │   │   ├── ozon
 │   │   │   │   └── OzonParserImpl.kt       # Реализация парсера для Ozon
+│   │   │   ├── plastinkacom
+│   │   │   │   └── PlastinkaComParserImpl.kt # Реализация парсера для Plastinka.com
+│   │   │   ├── pultru
+│   │   │   │   └── PultRuParserImpl.kt     # Реализация парсера для Pult.ru
 │   │   │   ├── selenium
 │   │   │   │   ├── SeleniumManager.kt      # Менеджер для инициализации WebDriver
 │   │   │   │   └── stealth
@@ -60,6 +78,7 @@ src
 │   │   │       └── YandexMarketParserImpl.kt # Реализация парсера для Яндекс.Маркета
 │   │   ├── service
 │   │   │   ├── ArticleService.kt          # Сервис для управления товарами
+│   │   │   ├── FeedbackService.kt         # Сервис для управления обратной связью
 │   │   │   ├── SubscriptionService.kt     # Сервис для управления подписками
 │   │   │   ├── TaskService.kt             # Сервис для задач
 │   │   │   └── UserService.kt             # Сервис для управления пользователями
@@ -67,18 +86,22 @@ src
 │   │       ├── Database.kt                # Настройки и конфигурация базы данных
 │   │       ├── dao
 │   │       │   ├── ArticleDao.kt          # DAO для работы с товарами
+│   │       │   ├── FeedbackMessagesDao.kt # DAO для работы с обратной связью
 │   │       │   ├── SubscriptionDao.kt     # DAO для работы с подписками
 │   │       │   └── UserDao.kt             # DAO для работы с пользователями
 │   │       ├── models
 │   │       │   ├── Article.kt             # Модель товара
+│   │       │   ├── FeedbackMessage.kt     # Модель сообщения обратной связи
 │   │       │   ├── Subscription.kt        # Модель подписки
 │   │       │   ├── Tariff.kt              # Модель тарифа
 │   │       │   └── User.kt                # Модель пользователя
 │   │       ├── repository
-│   │       │   ├── SubscriptionRepository.kt # Репозиторий подписок
-│   │       │   └── UserRepository.kt      # Репозиторий пользователей
+│   │       │   ├── FeedbackMessageRepository.kt # Репозиторий обратной связи
+│   │       │   ├── SubscriptionRepository.kt   # Репозиторий подписок
+│   │       │   └── UserRepository.kt          # Репозиторий пользователей
 │   │       └── tables
 │   │           ├── Articles.kt            # Таблица для хранения товаров
+│   │           ├── FeedbackMessages.kt    # Таблица для хранения обратной связи
 │   │           ├── Subscriptions.kt       # Таблица для хранения подписок
 │   │           └── Users.kt               # Таблица для хранения пользователей
 │   └── resources
@@ -99,5 +122,5 @@ src
 │           ├── webgl.vendor.js
 │           └── window.outerdimensions.js
 └── test
-    ├── kotlin                            # Тесты на Kotlin
-    └── resources                         # Ресурсы для тестов
+    ├── kotlin
+    └── resources
