@@ -57,9 +57,9 @@ object TaskService {
                         var message = ""
                         if (isChanged) {
                             subscriptionService.updateSubscriptionArticlePrice(subscription, newPrice!!)
-                            message += "Цена на ${subscription.article.name} изменилась! " +
-                                    "Старая цена: ${subscription.article.price} " +
-                                    "Новая цена: ${newPrice}\n"
+                            message += "Цена на [${subscription.article.name}](${subscription.article.url}) " +
+                                    "Старая цена: `${subscription.article.price}`\n" +
+                                    "Новая цена: `${newPrice}`\n"
                         } else {
                             message += "Цена на [${subscription.article.name}](${subscription.article.url}) не изменилась! Стоимость: `${subscription.article.price} руб.`\n"
                         }
