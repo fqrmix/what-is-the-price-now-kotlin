@@ -21,6 +21,7 @@ import org.example.storage.models.Article
 import org.example.storage.models.FeedbackMessage
 import org.example.storage.models.Subscription
 import org.example.storage.models.Tariff
+import java.math.BigDecimal
 import java.net.MalformedURLException
 import java.net.URL
 import java.time.LocalDateTime
@@ -418,15 +419,30 @@ class ChatBot {
                 }
                 currentSubscriptions.forEach {
                     GlobalScope.launch {
-                        val (newPrice, isChanged) = articleService.checkPriceChange(it.article)
-                        if (isChanged) {
-                            subscriptionService.updateSubscriptionArticlePrice(it, newPrice!!)
+                        lateinit var result: Pair<BigDecimal?, Boolean>
+                        try {
+                            result = articleService.checkPriceChange(it.article)
+                        } catch (e: Exception) {
+                            logSuccessOrError({
+                                bot.sendMessage(
+                                    ChatId.fromId(chatId),
+                                    text = "Не удалось получить " +
+                                            "актуальную цену на товар: [${it.article.name}](${it.article.url})\n" +
+                                            "Возможно, товара нет в наличии.",
+                                    parseMode = ParseMode.MARKDOWN,
+                                    replyMarkup = createMainKeyboard()
+                                )
+                            })
+                        }
+
+                        if (result.second) {
+                            subscriptionService.updateSubscriptionArticlePrice(it, result.first!!)
                             logSuccessOrError({
                                 bot.sendMessage(
                                     ChatId.fromId(chatId),
                                     text = "Цена на [${it.article.name}](${it.article.url}) изменилась! " +
                                             "Старая цена: `${it.article.price}`\n" +
-                                            "Новая цена: `${newPrice}`\n",
+                                            "Новая цена: `${result.first}`\n",
                                     parseMode = ParseMode.MARKDOWN,
                                     replyMarkup = createMainKeyboard()
                                 )

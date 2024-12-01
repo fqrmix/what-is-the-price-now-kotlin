@@ -11,6 +11,7 @@ import org.example.common.Scheduler
 import org.example.storage.models.Subscription
 import org.example.storage.models.User
 import org.example.storage.repository.SubscriptionRepository
+import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.concurrent.ScheduledFuture
 
@@ -53,15 +54,29 @@ object TaskService {
             RunnableTask {
                 GlobalScope.launch {
                     try {
-                        val (newPrice, isChanged) = articleService.checkPriceChange(subscription.article)
+                        lateinit var result: Pair<BigDecimal?, Boolean>
+                        try {
+                            result = articleService.checkPriceChange(subscription.article)
+                        } catch (e: Exception) {
+                                bot.sendMessage(
+                                    ChatId.fromId(user.id),
+                                    text = "Не удалось получить " +
+                                            "актуальную цену на товар: " +
+                                            "[${subscription.article.name}](${subscription.article.url})\n" +
+                                            "Возможно, товара нет в наличии.",
+                                    parseMode = ParseMode.MARKDOWN,
+                                )
+                        }
+
                         var message = ""
-                        if (isChanged) {
-                            subscriptionService.updateSubscriptionArticlePrice(subscription, newPrice!!)
+                        if (result.second) {
+                            subscriptionService.updateSubscriptionArticlePrice(subscription, result.first!!)
                             message += "Цена на [${subscription.article.name}](${subscription.article.url}) " +
                                     "Старая цена: `${subscription.article.price}`\n" +
-                                    "Новая цена: `${newPrice}`\n"
+                                    "Новая цена: `${result.first}`\n"
                         } else {
-                            message += "Цена на [${subscription.article.name}](${subscription.article.url}) не изменилась! Стоимость: `${subscription.article.price} руб.`\n"
+                            message += "Цена на [${subscription.article.name}](${subscription.article.url}) " +
+                                    "не изменилась! Стоимость: `${subscription.article.price} руб.`\n"
                         }
 
                         bot.sendMessage(
